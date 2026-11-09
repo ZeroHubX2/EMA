@@ -1,0 +1,1804 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+local VIM = game:GetService("VirtualInputManager")
+
+local LP = Players.LocalPlayer
+local LOBBY_PLACE = 7243409883
+local SURVIVAL_PLACE = 139694166885052
+local FOLDER = "ElementalMagicArena"
+
+local Env = (getgenv and getgenv()) or _G
+if type(Env.EMA_Unload) == "function" then
+    pcall(Env.EMA_Unload)
+    task.wait(0.3)
+end
+local Session = {}
+Env.EMA_Session = Session
+local Conns = {}
+local function track(c)
+    table.insert(Conns, c)
+    return c
+end
+
+pcall(function()
+    if getconnections then
+        for _, c in ipairs(getconnections(CoreGui.DescendantAdded)) do
+            local f = c.Function
+            local ok, src = pcall(function() return f and getfenv(f).script end)
+            if ok and src and src.Name == "Anti" then
+                c:Disable()
+            end
+        end
+    end
+end)
+
+pcall(function()
+    local anti = LP:FindFirstChild("PlayerScripts") and LP.PlayerScripts:FindFirstChild("Anti")
+    if anti then anti.Disabled = true end
+end)
+
+local function readFile(name)
+    local ok, data = pcall(function()
+        if isfile and isfile(FOLDER .. "/" .. name) then return readfile(FOLDER .. "/" .. name) end
+    end)
+    return ok and data or nil
+end
+
+local function writeFile(name, data)
+    pcall(function()
+        if makefolder and isfolder and not isfolder(FOLDER) then makefolder(FOLDER) end
+        writefile(FOLDER .. "/" .. name, data)
+    end)
+end
+
+local Lang = readFile("lang.txt") or "TH"
+
+local T = {
+    TH = {
+        Sub = "Survival",
+        TabMain = "ฟาร์ม",
+        TabSkill = "สกิล",
+        TabHitbox = "Hitbox",
+        TabSettings = "ตั้งค่า",
+        SecStatus = "สถานะ",
+        Status = "สถานะ",
+        Idle = "ว่าง",
+        SecJoin = "เข้าดัน (Survival)",
+        AutoJoin = "เข้า Survival อัตโนมัติ",
+        AutoJoinDesc = "ใช้ในล็อบบี้ สร้างห้องแล้วกดเริ่มเอง",
+        JoinMode = "โหมดเข้า",
+        JoinSolo = "เล่นคนเดียว",
+        JoinRandom = "เซิร์ฟสุ่ม",
+        SecFarm = "ฟาร์มซอมบี้",
+        AutoFarm = "วาร์ปไปหาซอมบี้",
+        AutoFarmDesc = "ไปอยู่ใกล้ซอมบี้ตัวที่ใกล้ที่สุดและหันหน้าเข้าหา",
+        Distance = "ระยะห่าง",
+        Height = "ความสูง",
+        FarmPos = "ตำแหน่งตี",
+        PosBehind = "ด้านหลัง",
+        PosAbove = "ด้านบน",
+        PosBelow = "ใต้พื้น",
+        AboveHeight = "ความสูงเหนือศัตรู (ด้านบน)",
+        BelowDepth = "ความลึกใต้ศัตรู (ใต้พื้น)",
+        FaceDown = "หันหน้าหาเป้า (ด้านบน/ใต้พื้น)",
+        FaceDownDesc = "สกิลที่ยิงตามทิศตัวละครจะพุ่งตรงไปหาศัตรู",
+        SecCollect = "เก็บของ",
+        AutoCollect = "เก็บ Candy / Diamond อัตโนมัติ",
+        AutoCollectDesc = "เก็บของที่ซอมบี้ดรอปทั่วแมพ",
+        CollectDiamond = "เก็บ Diamond",
+        CollectCandy = "เก็บ Candy",
+        SecPick = "เลือกสกิล",
+        AutoPick = "เลือกสกิล + เกิดอัตโนมัติ",
+        AutoPickDesc = "อยู่ห้องเลือกธาตุ (ตอนเริ่ม/ตาย) จะวาร์ปไปแตะแท่นธาตุที่เลือกแล้วลงด่านให้",
+        Element = "ธาตุ (ต้องปลดล็อกแล้ว)",
+        PickNow = "ไปแท่นธาตุตอนนี้",
+        SecUse = "ใช้สกิล",
+        AutoSkill = "ใช้สกิลอัตโนมัติ",
+        AutoSkillDesc = "ถือสกิลทีละอัน เล็งซอมบี้แล้วกดให้",
+        Keys = "ปุ่มที่กด",
+        SkillDelay = "หน่วงระหว่างสกิล (วินาที)",
+        SkillSlots = "สกิลที่จะใช้ (ช่อง)",
+        SkillSlotsDesc = "เลือกช่องสกิลบนแถบด้านล่าง เช่น 1 กับ 3 ไม่เอา 2",
+        RealClick = "คลิกเมาส์จริง",
+        RealClickDesc = "สำหรับสกิลที่รับแต่การคลิกจริง เช่น Gravity Rocks จะคลิกตรงซอมบี้บนจอ (ใช้ได้ทั้ง PC และมือถือ)",
+        ClickHold = "ระยะเวลากดต่อคลิก (วินาที)",
+        ClickHoldDesc = "ปกติคลิกครั้งเดียวก็ออก (0.05) ถ้าเจอสกิลที่ต้องกดค้างให้เพิ่มค่านี้",
+        SpamClick = "คลิกรัว",
+        SpamClickDesc = "คลิกรัวตลอดช่วงที่ถือสกิล (ดาบจะฟันรัวๆ) ต้องเลือก Click ในปุ่มที่กดด้วย",
+        ClickRate = "ห่างกันกี่วินาทีต่อคลิก",
+        KeyPause = "รอสกิลปุ่มจบสูงสุด (วินาที)",
+        KeyPauseDesc = "กดสกิลปุ่ม (Q/E/...) ก่อน ถ้าสกิลออกจะหยุดตีรอจนท่าจบ ถ้าติดคูลดาวน์จะตีต่อทันที",
+        CastTime = "ถือสกิลรอสูงสุด (วินาที)",
+        CastTimeDesc = "ถือสกิลค้างจนสกิลออก (เริ่มนับคูลดาวน์) ค่อยเปลี่ยนอันถัดไป ถ้าสกิลไหนออกไม่ทันให้เพิ่มค่านี้",
+        AimLock = "ล็อกเป้าที่ซอมบี้",
+        AimLockDesc = "สกิลจะเล็งไปที่ซอมบี้เอง ไม่แย่งเมาส์/กล้อง ใช้ได้ทั้ง PC และมือถือ",
+        Range = "ระยะหาเป้า",
+        SecHitbox = "Hitbox ซอมบี้",
+        SecCamera = "กล้อง",
+        CamClip = "กล้องทะลุกำแพง/พื้น",
+        CamClipDesc = "กล้องไม่โดนกำแพงหรือพื้นบัง ของที่บังจะโปร่งใส ตอนตีใต้พื้นกล้องจะจับที่ซอมบี้บนพื้นแทน",
+        Hitbox = "ขยาย Hitbox",
+        HitboxDesc = "ขยายตัวซอมบี้ฝั่งเรา ช่วยให้เล็ง/โดนง่ายขึ้น",
+        HitboxSize = "ขนาด",
+        HitboxTrans = "ความโปร่งใส",
+        SecLang = "ภาษา",
+        PickSearch = "ค้นหา...",
+        PickAll = "ทั้งหมด",
+        PickClear = "ล้าง",
+        PickDone = "เสร็จ",
+        SecWindow = "หน้าต่าง",
+        WinWidth = "ความกว้างหน้าต่าง",
+        WinHeight = "ความสูงหน้าต่าง",
+        WinFit = "ปรับให้พอดีจอ",
+        Language = "ภาษา (มีผลตอนรันใหม่)",
+        LangSaved = "บันทึกภาษาแล้ว รันสคริปต์ใหม่เพื่อเปลี่ยน",
+        Loaded = "โหลดสคริปต์แล้ว",
+        LoadedSave = "โหลดสคริปต์แล้ว + โหลดการตั้งค่าที่บันทึกไว้",
+        NotInSurvival = "ไม่ได้อยู่ใน Survival",
+        Spawning = "กำลังเลือกสกิลและเกิด",
+        Fighting = "กำลังสู้: ",
+        Waiting = "รอซอมบี้",
+        Joining = "กำลังเข้า Survival",
+    },
+    EN = {
+        Sub = "Survival",
+        TabMain = "Farm",
+        TabSkill = "Skills",
+        TabHitbox = "Hitbox",
+        TabSettings = "Settings",
+        SecStatus = "Status",
+        Status = "Status",
+        Idle = "Idle",
+        SecJoin = "Dungeon (Survival)",
+        AutoJoin = "Auto Join Survival",
+        AutoJoinDesc = "Use in the lobby: hosts a squad and starts it",
+        JoinMode = "Join mode",
+        JoinSolo = "Solo",
+        JoinRandom = "Random server",
+        SecFarm = "Zombie Farm",
+        AutoFarm = "Teleport to Zombies",
+        AutoFarmDesc = "Stay next to the nearest zombie and face it",
+        Distance = "Distance",
+        Height = "Height",
+        FarmPos = "Attack position",
+        PosBehind = "Behind",
+        PosAbove = "Above",
+        PosBelow = "Under ground",
+        AboveHeight = "Height above enemy (Above)",
+        BelowDepth = "Depth under enemy (Under ground)",
+        FaceDown = "Face the target (Above/Under ground)",
+        FaceDownDesc = "Skills fired along your facing go straight at the enemy",
+        SecCollect = "Collect",
+        AutoCollect = "Auto Collect Candy / Diamond",
+        AutoCollectDesc = "Picks up zombie drops anywhere on the map",
+        CollectDiamond = "Collect Diamonds",
+        CollectCandy = "Collect Candy",
+        SecPick = "Skill Pick",
+        AutoPick = "Auto Pick Skills + Spawn",
+        AutoPickDesc = "In the element room (start/death) it teleports to the chosen element stand and enters the arena",
+        Element = "Element (must be unlocked)",
+        PickNow = "Go to element stand now",
+        SecUse = "Use Skills",
+        AutoSkill = "Auto Use Skills",
+        AutoSkillDesc = "Equips each skill, aims at a zombie and uses it",
+        Keys = "Keys to press",
+        SkillDelay = "Delay between skills (s)",
+        SkillSlots = "Skills to use (slot)",
+        SkillSlotsDesc = "Pick hotbar slots, e.g. 1 and 3 but not 2",
+        RealClick = "Real mouse click",
+        RealClickDesc = "For skills that only react to a real click, e.g. Gravity Rocks. Clicks on the zombie on screen (PC and mobile)",
+        ClickHold = "Press time per click (s)",
+        ClickHoldDesc = "A single click is usually enough (0.05). Raise it only for skills that must be held",
+        SpamClick = "Spam click",
+        SpamClickDesc = "Keeps clicking while the skill is held (swords swing nonstop). Click must be selected in Keys",
+        ClickRate = "Seconds between clicks",
+        KeyPause = "Max wait for key skill (s)",
+        KeyPauseDesc = "Key skills (Q/E/...) go first. If one fires, attacks pause until its animation ends; if it is on cooldown, attacking resumes at once",
+        CastTime = "Max hold per skill (s)",
+        CastTimeDesc = "Keeps the skill equipped until it fires (cooldown starts) before switching. Raise it if a skill gets cut off",
+        AimLock = "Aim lock on zombie",
+        AimLockDesc = "Skills aim at the zombie by themselves, your mouse/camera stay free (PC and mobile)",
+        Range = "Target range",
+        SecHitbox = "Zombie Hitbox",
+        SecCamera = "Camera",
+        CamClip = "Camera through walls/floor",
+        CamClipDesc = "Walls and floor no longer block the camera, blocking parts turn see-through. When attacking under ground the camera follows the zombie above",
+        Hitbox = "Expand Hitbox",
+        HitboxDesc = "Enlarges zombies on your side to make aiming/hitting easier",
+        HitboxSize = "Size",
+        HitboxTrans = "Transparency",
+        SecLang = "Language",
+        PickSearch = "Search...",
+        PickAll = "All",
+        PickClear = "Clear",
+        PickDone = "Done",
+        SecWindow = "Window",
+        WinWidth = "Window width",
+        WinHeight = "Window height",
+        WinFit = "Fit to screen",
+        Language = "Language (applies on rerun)",
+        LangSaved = "Language saved, rerun the script to switch",
+        Loaded = "Script loaded",
+        LoadedSave = "Script loaded + saved settings restored",
+        NotInSurvival = "Not in Survival",
+        Spawning = "Picking skills and spawning",
+        Fighting = "Fighting: ",
+        Waiting = "Waiting for zombies",
+        Joining = "Joining Survival",
+    },
+}
+local L = T[Lang] or T.TH
+
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local ViewSize = workspace.CurrentCamera.ViewportSize
+local InputSvc = game:GetService("UserInputService")
+local IsMobile = (InputSvc.TouchEnabled and not InputSvc.KeyboardEnabled) or ViewSize.X < 700
+local DefaultW = math.floor(math.min(580, ViewSize.X - 30))
+local DefaultH = math.floor(math.min(460, ViewSize.Y - 30))
+
+local Window = Fluent:CreateWindow({
+    Title = "Elemental Magic Arena",
+    SubTitle = L.Sub,
+    TabWidth = IsMobile and 110 or 160,
+    Size = UDim2.fromOffset(DefaultW, DefaultH),
+    Acrylic = false,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl,
+})
+
+local Tabs = {
+    Main = Window:AddTab({ Title = L.TabMain, Icon = "swords" }),
+    Skill = Window:AddTab({ Title = L.TabSkill, Icon = "flame" }),
+    Hitbox = Window:AddTab({ Title = L.TabHitbox, Icon = "box" }),
+    Settings = Window:AddTab({ Title = L.TabSettings, Icon = "settings" }),
+}
+
+local Options = Fluent.Options
+
+local function stopped()
+    return Fluent.Unloaded or Env.EMA_Session ~= Session
+end
+
+local SliderTitles = {}
+
+local function addSlider(section, id, cfg)
+    SliderTitles[cfg.Title] = id
+    return section:AddSlider(id, cfg)
+end
+
+local PickerGui = Instance.new("ScreenGui")
+PickerGui.Name = "EMAPicker"
+PickerGui.ResetOnSpawn = false
+PickerGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+PickerGui.DisplayOrder = 1000
+PickerGui.IgnoreGuiInset = true
+pcall(function()
+    PickerGui.Parent = (gethui and gethui()) or CoreGui
+end)
+if not PickerGui.Parent then
+    PickerGui.Parent = LP:WaitForChild("PlayerGui")
+end
+
+local PC = {
+    bg = Color3.fromRGB(32, 32, 38),
+    row = Color3.fromRGB(44, 44, 52),
+    rowOn = Color3.fromRGB(40, 90, 120),
+    text = Color3.fromRGB(240, 240, 245),
+    sub = Color3.fromRGB(170, 170, 180),
+    accent = Color3.fromRGB(96, 205, 255),
+}
+
+local function ui(class, props, parent)
+    local o = Instance.new(class)
+    for k, v in pairs(props) do o[k] = v end
+    o.Parent = parent
+    return o
+end
+
+local function corner(o, r)
+    ui("UICorner", { CornerRadius = UDim.new(0, r or 8) }, o)
+end
+
+local function closePicker()
+    for _, c in ipairs(PickerGui:GetChildren()) do c:Destroy() end
+end
+
+local function openPicker(opt)
+    closePicker()
+    local vp = workspace.CurrentCamera.ViewportSize
+    local w = math.floor(math.min(380, vp.X - 24))
+    local h = math.floor(math.min(520, vp.Y - 40))
+
+    local dim = ui("TextButton", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundColor3 = Color3.new(0, 0, 0),
+        BackgroundTransparency = 0.45,
+        Text = "",
+        AutoButtonColor = false,
+    }, PickerGui)
+    dim.Activated:Connect(closePicker)
+
+    local panel = ui("Frame", {
+        Size = UDim2.fromOffset(w, h),
+        Position = UDim2.fromScale(0.5, 0.5),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        BackgroundColor3 = PC.bg,
+        Active = true,
+    }, PickerGui)
+    corner(panel, 12)
+    ui("UIStroke", { Color = PC.accent, Thickness = 1.5, Transparency = 0.3 }, panel)
+
+    ui("TextLabel", {
+        Size = UDim2.new(1, -60, 0, 40),
+        Position = UDim2.fromOffset(14, 6),
+        BackgroundTransparency = 1,
+        Text = opt.Title,
+        TextColor3 = PC.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 17,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+    }, panel)
+
+    local closeBtn = ui("TextButton", {
+        Size = UDim2.fromOffset(40, 40),
+        Position = UDim2.new(1, -46, 0, 6),
+        BackgroundColor3 = PC.row,
+        Text = "X",
+        TextColor3 = PC.text,
+        Font = Enum.Font.GothamBold,
+        TextSize = 16,
+    }, panel)
+    corner(closeBtn, 8)
+    closeBtn.Activated:Connect(closePicker)
+
+    local top = 52
+    local search
+    if #opt.Values > 8 then
+        search = ui("TextBox", {
+            Size = UDim2.new(1, -28, 0, 38),
+            Position = UDim2.fromOffset(14, top),
+            BackgroundColor3 = PC.row,
+            PlaceholderText = L.PickSearch,
+            PlaceholderColor3 = PC.sub,
+            Text = "",
+            TextColor3 = PC.text,
+            Font = Enum.Font.Gotham,
+            TextSize = 15,
+            ClearTextOnFocus = false,
+        }, panel)
+        corner(search, 8)
+        top = top + 46
+    end
+
+    local bottom = 0
+    local refresh
+    if opt.Multi then
+        bottom = 52
+        local bar = ui("Frame", {
+            Size = UDim2.new(1, -28, 0, 40),
+            Position = UDim2.new(0, 14, 1, -48),
+            BackgroundTransparency = 1,
+        }, panel)
+        ui("UIListLayout", {
+            FillDirection = Enum.FillDirection.Horizontal,
+            Padding = UDim.new(0, 8),
+            HorizontalAlignment = Enum.HorizontalAlignment.Center,
+        }, bar)
+        local function barBtn(text, color, fn)
+            local b = ui("TextButton", {
+                Size = UDim2.new(1 / 3, -6, 1, 0),
+                BackgroundColor3 = color,
+                Text = text,
+                TextColor3 = PC.text,
+                Font = Enum.Font.GothamBold,
+                TextSize = 15,
+            }, bar)
+            corner(b, 8)
+            b.Activated:Connect(fn)
+        end
+        barBtn(L.PickAll, PC.row, function()
+            local t = {}
+            for _, v in ipairs(opt.Values) do t[v] = true end
+            opt:SetValue(t)
+            refresh()
+        end)
+        barBtn(L.PickClear, PC.row, function()
+            opt:SetValue({})
+            refresh()
+        end)
+        barBtn(L.PickDone, PC.rowOn, closePicker)
+    end
+
+    local list = ui("ScrollingFrame", {
+        Size = UDim2.new(1, -20, 1, -(top + bottom + 10)),
+        Position = UDim2.fromOffset(10, top),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 6,
+        ScrollBarImageColor3 = PC.accent,
+        CanvasSize = UDim2.new(),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        ScrollingDirection = Enum.ScrollingDirection.Y,
+        ElasticBehavior = Enum.ElasticBehavior.Always,
+    }, panel)
+    ui("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, list)
+    ui("UIPadding", { PaddingRight = UDim.new(0, 8), PaddingLeft = UDim.new(0, 4), PaddingTop = UDim.new(0, 2), PaddingBottom = UDim.new(0, 4) }, list)
+
+    local rows = {}
+    local function selected(v)
+        if opt.Multi then return opt.Value[v] == true end
+        return opt.Value == v
+    end
+    refresh = function()
+        local q = search and search.Text:lower() or ""
+        for v, r in pairs(rows) do
+            r.Visible = q == "" or v:lower():find(q, 1, true) ~= nil
+            local on = selected(v)
+            r.BackgroundColor3 = on and PC.rowOn or PC.row
+            r.Check.Text = on and "✓" or ""
+        end
+    end
+    for i, v in ipairs(opt.Values) do
+        local r = ui("TextButton", {
+            Name = "Row",
+            LayoutOrder = i,
+            Size = UDim2.new(1, 0, 0, 44),
+            BackgroundColor3 = PC.row,
+            Text = "",
+            AutoButtonColor = true,
+        }, list)
+        corner(r, 8)
+        ui("TextLabel", {
+            Size = UDim2.new(1, -56, 1, 0),
+            Position = UDim2.fromOffset(14, 0),
+            BackgroundTransparency = 1,
+            Text = v,
+            TextColor3 = PC.text,
+            Font = Enum.Font.Gotham,
+            TextSize = 15,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextTruncate = Enum.TextTruncate.AtEnd,
+        }, r)
+        ui("TextLabel", {
+            Name = "Check",
+            Size = UDim2.fromOffset(40, 44),
+            Position = UDim2.new(1, -44, 0, 0),
+            BackgroundTransparency = 1,
+            Text = "",
+            TextColor3 = PC.accent,
+            Font = Enum.Font.GothamBold,
+            TextSize = 20,
+        }, r)
+        rows[v] = r
+        r.Activated:Connect(function()
+            if opt.Multi then
+                local t = {}
+                for k, on in pairs(opt.Value) do if on then t[k] = true end end
+                t[v] = not t[v] or nil
+                opt:SetValue(t)
+                refresh()
+            else
+                opt:SetValue(v)
+                closePicker()
+            end
+        end)
+    end
+    if search then
+        search:GetPropertyChangedSignal("Text"):Connect(refresh)
+    end
+    refresh()
+end
+
+local function addPicker(section, id, cfg)
+    local opt = {
+        Type = "Dropdown",
+        Title = cfg.Title,
+        Values = cfg.Values or {},
+        Multi = cfg.Multi == true,
+        Callback = cfg.Callback,
+        Changed = nil,
+    }
+    local btn
+    local function display()
+        if opt.Multi then
+            local parts = {}
+            for _, v in ipairs(opt.Values) do
+                if opt.Value[v] then table.insert(parts, v) end
+            end
+            return #parts > 0 and table.concat(parts, ", ") or "-"
+        end
+        return opt.Value ~= nil and tostring(opt.Value) or "-"
+    end
+    local baseDesc = cfg.Description
+    local function descText()
+        local cur = "> " .. display()
+        return baseDesc and (baseDesc .. "\n" .. cur) or cur
+    end
+    function opt:SetValue(v)
+        if self.Multi then
+            local t = {}
+            if type(v) == "table" then
+                for k, on in pairs(v) do
+                    if type(k) == "number" then
+                        t[on] = true
+                    elseif on then
+                        t[k] = true
+                    end
+                end
+            end
+            self.Value = t
+        else
+            if type(v) == "number" then v = self.Values[v] end
+            self.Value = v
+        end
+        if btn then pcall(function() btn:SetDesc(descText()) end) end
+        if self.Callback then task.spawn(pcall, self.Callback, self.Value) end
+        if self.Changed then task.spawn(pcall, self.Changed, self.Value) end
+    end
+    function opt:OnChanged(fn)
+        self.Changed = fn
+        fn(self.Value)
+    end
+    function opt:SetValues(list)
+        self.Values = list
+        if not self.Multi and not table.find(list, self.Value) then
+            self.Value = list[1]
+        end
+        if btn then pcall(function() btn:SetDesc(descText()) end) end
+    end
+    function opt:Destroy()
+        Options[id] = nil
+    end
+    if opt.Multi then
+        opt.Value = {}
+        if type(cfg.Default) == "table" then
+            for _, v in ipairs(cfg.Default) do opt.Value[v] = true end
+        end
+    else
+        local d = cfg.Default
+        if type(d) == "number" then d = opt.Values[d] end
+        opt.Value = d ~= nil and d or opt.Values[1]
+    end
+    btn = section:AddButton({
+        Title = cfg.Title,
+        Description = descText(),
+        Callback = function() openPicker(opt) end,
+    })
+    Options[id] = opt
+    if opt.Callback then task.spawn(pcall, opt.Callback, opt.Value) end
+    return opt
+end
+
+local ElementNames = {}
+local ElementByName = {}
+pcall(function()
+    local cfg = require(ReplicatedStorage:WaitForChild("ElementConfig", 10))
+    for _, e in ipairs(cfg) do
+        if type(e) == "table" and e.name and e.folder then
+            table.insert(ElementNames, e.name)
+            ElementByName[e.name] = e
+        end
+    end
+end)
+
+local ElementLower = {}
+for _, n in ipairs(ElementNames) do ElementLower[n:lower()] = n end
+
+local function trim(s)
+    return (s:gsub("^%s+", ""):gsub("%s+$", ""))
+end
+
+local function findStands()
+    local labels = {}
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("TextLabel") then
+            local name = ElementLower[trim(d.Text):lower()]
+            local bb = name and d:FindFirstAncestorWhichIsA("BillboardGui")
+            if bb then
+                local ad = bb.Adornee or bb.Parent
+                local pos
+                if ad and ad:IsA("BasePart") then pos = ad.Position
+                elseif ad and ad:IsA("Attachment") then pos = ad.WorldPosition
+                elseif ad and ad:IsA("Model") then pos = ad:GetPivot().Position end
+                if pos and pos.Y > -60 then table.insert(labels, { name = name, pos = pos }) end
+            end
+        end
+    end
+    local stands = {}
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("BasePart") and d.Position.Y > -60 and d:FindFirstChildOfClass("TouchTransmitter") then
+            local n = d.Name:lower()
+            local isStand = (n:find("tp$") or n:find("teleport")) and not d:FindFirstAncestor("Redeem Codes PAD")
+            if isStand then
+                local best, bestD = nil, 40
+                for _, l in ipairs(labels) do
+                    local dist = (l.pos - d.Position).Magnitude
+                    if dist < bestD then best, bestD = l.name, dist end
+                end
+                if best and not stands[best] then stands[best] = d end
+            end
+        end
+    end
+    return stands
+end
+
+local Stands = {}
+pcall(function() Stands = findStands() end)
+
+local Mouse = LP:GetMouse()
+local AimTarget = nil
+local CastUntil = 0
+local Cam = workspace.CurrentCamera
+track(workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+    Cam = workspace.CurrentCamera
+end))
+
+local function fromSkill()
+    if not getcallingscript then return false end
+    local ok, s = pcall(getcallingscript)
+    if not ok or typeof(s) ~= "Instance" then return false end
+    local tool = s:FindFirstAncestorOfClass("Tool")
+    return tool ~= nil and (tool.Parent == LP.Character or tool.Parent == LP:FindFirstChild("Backpack"))
+end
+
+local function aimLive()
+    return AimTarget ~= nil and AimTarget.Parent ~= nil
+end
+
+pcall(function()
+    local prev
+    prev = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        if not checkcaller() then
+            local method = getnamecallmethod()
+            if method == "Kick" and self == LP then
+                return nil
+            end
+            if self == Cam and AimTarget and (method == "ViewportPointToRay" or method == "ScreenPointToRay") then
+                local spoof = aimLive() and fromSkill()
+                setnamecallmethod(method)
+                local ray = prev(self, ...)
+                if spoof and ray then
+                    return Ray.new(ray.Origin, (AimTarget.Position - ray.Origin).Unit)
+                end
+                return ray
+            end
+        end
+        return prev(self, ...)
+    end))
+end)
+
+pcall(function()
+    local prevIndex
+    prevIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
+        local watched = (self == Mouse and (key == "Hit" or key == "Target" or key == "UnitRay")) or (self == Cam and key == "CFrame")
+        if watched and AimTarget and not checkcaller() and aimLive() then
+            if self == Mouse and fromSkill() then
+                if key == "Hit" then
+                    return CFrame.new(AimTarget.Position)
+                elseif key == "Target" then
+                    return AimTarget
+                else
+                    local ray = prevIndex(self, key)
+                    return Ray.new(ray.Origin, (AimTarget.Position - ray.Origin).Unit)
+                end
+            elseif self == Cam and os.clock() < CastUntil and fromSkill() then
+                local real = prevIndex(self, key)
+                return CFrame.lookAt(real.Position, AimTarget.Position)
+            end
+        end
+        return prevIndex(self, key)
+    end))
+end)
+
+pcall(function()
+    local prevNew
+    prevNew = hookmetamethod(game, "__newindex", newcclosure(function(self, key, value)
+        if self == Cam and key == "CFrame" and AimTarget and not checkcaller() and fromSkill() then
+            return
+        end
+        return prevNew(self, key, value)
+    end))
+end)
+
+local function char()
+    return LP.Character
+end
+
+local function root()
+    local c = char()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function humanoid()
+    local c = char()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+
+local function alive()
+    local h = humanoid()
+    return h and h.Health > 0 and root() ~= nil
+end
+
+local function getTools()
+    local list = {}
+    local bp = LP:FindFirstChild("Backpack")
+    if bp then
+        for _, t in ipairs(bp:GetChildren()) do
+            if t:IsA("Tool") then table.insert(list, t) end
+        end
+    end
+    local c = char()
+    if c then
+        for _, t in ipairs(c:GetChildren()) do
+            if t:IsA("Tool") then table.insert(list, t) end
+        end
+    end
+    return list
+end
+
+local function zombieAlive(z)
+    local h = z:FindFirstChildOfClass("Humanoid")
+    local r = z:FindFirstChild("HumanoidRootPart")
+    return h and r and h.Health > 0 and z.Parent ~= nil
+end
+
+local Enemies = {}
+
+local function isEnemy(m)
+    return m:IsA("Model") and (m:GetAttribute("Team") == "Zombies" or CollectionService:HasTag(m, "SurvivalZombie"))
+end
+
+for _, m in ipairs(workspace:GetChildren()) do
+    if isEnemy(m) then Enemies[m] = true end
+end
+
+track(workspace.ChildAdded:Connect(function(m)
+    if m:IsA("Model") then
+        task.wait(0.2)
+        if m.Parent and isEnemy(m) then Enemies[m] = true end
+    end
+end))
+
+track(workspace.ChildRemoved:Connect(function(m)
+    Enemies[m] = nil
+end))
+
+task.spawn(function()
+    while not stopped() do
+        task.wait(2)
+        for _, m in ipairs(workspace:GetChildren()) do
+            if not Enemies[m] and isEnemy(m) then Enemies[m] = true end
+        end
+    end
+end)
+
+local function getEnemies()
+    local list = {}
+    for m in pairs(Enemies) do
+        if m.Parent then
+            table.insert(list, m)
+        else
+            Enemies[m] = nil
+        end
+    end
+    return list
+end
+
+local function nearestZombie(range)
+    local r = root()
+    if not r then return nil end
+    local best, bestD = nil, range or math.huge
+    for _, z in ipairs(getEnemies()) do
+        if zombieAlive(z) then
+            local d = (z.HumanoidRootPart.Position - r.Position).Magnitude
+            if d < bestD then
+                best, bestD = z, d
+            end
+        end
+    end
+    return best
+end
+
+local function inSurvival()
+    return game.PlaceId == SURVIVAL_PLACE or #getEnemies() > 0
+end
+
+local function inArena()
+    return alive() and #getTools() > 0
+end
+
+local StatusPara
+
+local function setStatus(text)
+    if StatusPara then pcall(function() StatusPara:SetDesc(text) end) end
+end
+
+StatusPara = Tabs.Main:AddParagraph({ Title = L.Status, Content = L.Idle })
+
+local SecJoin = Tabs.Main:AddSection(L.SecJoin)
+SecJoin:AddToggle("AutoJoin", { Title = L.AutoJoin, Description = L.AutoJoinDesc, Default = false })
+addPicker(SecJoin, "JoinMode", { Title = L.JoinMode, Values = { L.JoinSolo, L.JoinRandom }, Multi = false, Default = 1 })
+
+local SecFarm = Tabs.Main:AddSection(L.SecFarm)
+SecFarm:AddToggle("AutoFarm", { Title = L.AutoFarm, Description = L.AutoFarmDesc, Default = false })
+addSlider(SecFarm, "FarmDistance", { Title = L.Distance, Default = 10, Min = 0, Max = 40, Rounding = 0 })
+addPicker(SecFarm, "FarmPos", { Title = L.FarmPos, Values = { L.PosBehind, L.PosAbove, L.PosBelow }, Multi = false, Default = 1 })
+addSlider(SecFarm, "FarmHeight", { Title = L.Height, Default = 3, Min = -5, Max = 30, Rounding = 0 })
+addSlider(SecFarm, "AboveHeight", { Title = L.AboveHeight, Default = 15, Min = 5, Max = 60, Rounding = 0 })
+addSlider(SecFarm, "BelowDepth", { Title = L.BelowDepth, Default = 8, Min = 3, Max = 40, Rounding = 0 })
+SecFarm:AddToggle("FaceDown", { Title = L.FaceDown, Description = L.FaceDownDesc, Default = false })
+
+local SecCollect = Tabs.Main:AddSection(L.SecCollect)
+SecCollect:AddToggle("AutoCollect", { Title = L.AutoCollect, Description = L.AutoCollectDesc, Default = false })
+addPicker(SecCollect, "CollectWhat", {
+    Title = L.SecCollect,
+    Values = { L.CollectDiamond, L.CollectCandy },
+    Multi = true,
+    Default = { L.CollectDiamond, L.CollectCandy },
+})
+
+local ElementValues = {}
+for _, n in ipairs(ElementNames) do
+    if Stands[n] then table.insert(ElementValues, n) end
+end
+if #ElementValues == 0 then ElementValues = { "Fire" } end
+
+local doSpawnRef
+
+local SecPick = Tabs.Skill:AddSection(L.SecPick)
+SecPick:AddToggle("AutoPick", { Title = L.AutoPick, Description = L.AutoPickDesc, Default = false })
+addPicker(SecPick, "PickElement", { Title = L.Element, Values = ElementValues, Multi = false, Default = "Fire" })
+SecPick:AddButton({
+    Title = L.PickNow,
+    Callback = function()
+        task.spawn(function() doSpawnRef() end)
+    end,
+})
+
+local SecUse = Tabs.Skill:AddSection(L.SecUse)
+SecUse:AddToggle("AutoSkill", { Title = L.AutoSkill, Description = L.AutoSkillDesc, Default = false })
+addPicker(SecUse, "SkillSlots", {
+    Title = L.SkillSlots,
+    Description = L.SkillSlotsDesc,
+    Values = { "1", "2", "3" },
+    Multi = true,
+    Default = { "1", "2", "3" },
+})
+addPicker(SecUse, "SkillKeys", {
+    Title = L.Keys,
+    Values = { "Click", "Q", "E", "R", "F", "X", "Z", "C", "V" },
+    Multi = true,
+    Default = { "Click", "Q", "E" },
+})
+SecUse:AddToggle("RealClick", { Title = L.RealClick, Description = L.RealClickDesc, Default = false })
+addSlider(SecUse, "ClickHold", { Title = L.ClickHold, Description = L.ClickHoldDesc, Default = 0.05, Min = 0.05, Max = 3, Rounding = 2 })
+SecUse:AddToggle("SpamClick", { Title = L.SpamClick, Description = L.SpamClickDesc, Default = false })
+addSlider(SecUse, "ClickRate", { Title = L.ClickRate, Default = 0.81, Min = 0.05, Max = 1, Rounding = 2 })
+addSlider(SecUse, "KeyPause", { Title = L.KeyPause, Description = L.KeyPauseDesc, Default = 1.4, Min = 0.3, Max = 6, Rounding = 1 })
+addSlider(SecUse, "CastTime", { Title = L.CastTime, Description = L.CastTimeDesc, Default = 0.5, Min = 0.5, Max = 6, Rounding = 1 })
+addSlider(SecUse, "SkillDelay", { Title = L.SkillDelay, Default = 0.2, Min = 0, Max = 3, Rounding = 1 })
+SecUse:AddToggle("AimLock", { Title = L.AimLock, Description = L.AimLockDesc, Default = false })
+addSlider(SecUse, "TargetRange", { Title = L.Range, Default = 150, Min = 20, Max = 1000, Rounding = 0 })
+
+local OrigOcclusion = LP.DevCameraOcclusionMode
+
+local SecCam = Tabs.Main:AddSection(L.SecCamera)
+SecCam:AddToggle("CamClip", {
+    Title = L.CamClip,
+    Description = L.CamClipDesc,
+    Default = false,
+    Callback = function(on)
+        pcall(function()
+            LP.DevCameraOcclusionMode = on and Enum.DevCameraOcclusionMode.Invisicam or OrigOcclusion
+        end)
+    end,
+})
+
+local SecHit = Tabs.Hitbox:AddSection(L.SecHitbox)
+SecHit:AddToggle("Hitbox", { Title = L.Hitbox, Description = L.HitboxDesc, Default = false })
+addSlider(SecHit, "HitboxSize", { Title = L.HitboxSize, Default = 12, Min = 2, Max = 60, Rounding = 0 })
+addSlider(SecHit, "HitboxTrans", { Title = L.HitboxTrans, Default = 0.7, Min = 0, Max = 1, Rounding = 1 })
+
+local lastSpawn = 0
+doSpawnRef = function()
+    if os.clock() - lastSpawn < 3 or not alive() or inArena() then return end
+    local pick = Options.PickElement.Value
+    local stand = Stands[pick]
+    if not stand or not stand.Parent then
+        pcall(function() Stands = findStands() end)
+        stand = Stands[pick]
+    end
+    if not stand then return end
+    lastSpawn = os.clock()
+    setStatus(L.Spawning .. " (" .. pick .. ")")
+    local r = root()
+    if firetouchinterest then
+        pcall(function()
+            firetouchinterest(r, stand, 0)
+            task.wait(0.1)
+            firetouchinterest(r, stand, 1)
+        end)
+    end
+    task.wait(1)
+    if alive() and not inArena() then
+        r = root()
+        if r then
+            r.CFrame = stand.CFrame + Vector3.new(0, 3, 0)
+        end
+    end
+end
+
+task.spawn(function()
+    while not stopped() do
+        task.wait(1)
+        if Options.AutoPick.Value and game.PlaceId == SURVIVAL_PLACE and alive() and not inArena() then
+            doSpawnRef()
+        end
+    end
+end)
+
+local lastJoin = 0
+task.spawn(function()
+    while not stopped() do
+        task.wait(2)
+        if Options.AutoJoin.Value and game.PlaceId == LOBBY_PLACE and os.clock() - lastJoin > 12 then
+            local folder = ReplicatedStorage:FindFirstChild("SurvivalSquad")
+            local ev = folder and folder:FindFirstChild("SquadEvent")
+            if ev then
+                lastJoin = os.clock()
+                setStatus(L.Joining)
+                if Options.JoinMode.Value == L.JoinRandom then
+                    pcall(function() ev:FireServer("Random") end)
+                else
+                    pcall(function() ev:FireServer("Host") end)
+                    task.wait(1.5)
+                    pcall(function() ev:FireServer("Start") end)
+                end
+            end
+        end
+    end
+end)
+
+local FarmTarget = nil
+local NoclipParts = {}
+
+local function setNoclip(on)
+    if on then
+        local c = char()
+        if not c then return end
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") and p.CanCollide then
+                NoclipParts[p] = true
+                p.CanCollide = false
+            end
+        end
+    elseif next(NoclipParts) then
+        for p in pairs(NoclipParts) do
+            if p.Parent then pcall(function() p.CanCollide = true end) end
+        end
+        table.clear(NoclipParts)
+    end
+end
+
+local CamOverride = false
+
+track(RunService.Stepped:Connect(function()
+    if stopped() then return end
+    local below = Options.AutoFarm.Value and Options.FarmPos.Value == L.PosBelow and FarmTarget ~= nil and inArena()
+    setNoclip(below)
+    local cam = workspace.CurrentCamera
+    local h = humanoid()
+    if cam and h then
+        local zh = below and Options.CamClip.Value and FarmTarget:FindFirstChildOfClass("Humanoid")
+        if zh then
+            if cam.CameraSubject ~= zh then cam.CameraSubject = zh end
+            CamOverride = true
+        elseif CamOverride then
+            CamOverride = false
+            cam.CameraSubject = h
+        end
+    end
+end))
+
+local SafePos = nil
+
+local function mapCenter()
+    local map = workspace:FindFirstChild("Zombie Map")
+    if not map then return nil end
+    local floor, area = nil, 0
+    for _, d in ipairs(map:GetDescendants()) do
+        if d:IsA("BasePart") and d.CanCollide then
+            local a = d.Size.X * d.Size.Z
+            if a > area then floor, area = d, a end
+        end
+    end
+    if not floor then return nil end
+    local top = floor.Position.Y + floor.Size.Y / 2
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    local ignore = { char() }
+    for _, z in ipairs(getEnemies()) do table.insert(ignore, z) end
+    params.FilterDescendantsInstances = ignore
+    local origin = Vector3.new(floor.Position.X, top + 200, floor.Position.Z)
+    local hit = workspace:Raycast(origin, Vector3.new(0, -260, 0), params)
+    if hit then return hit.Position + Vector3.new(0, 4, 0) end
+    return Vector3.new(floor.Position.X, top + 4, floor.Position.Z)
+end
+
+track(RunService.Heartbeat:Connect(function()
+    if stopped() then return end
+    local r = root()
+    if not r or not inArena() then
+        SafePos = nil
+        FarmTarget = nil
+        return
+    end
+    if not SafePos then
+        SafePos = mapCenter() or r.Position
+    end
+    if not Options.AutoFarm.Value then
+        FarmTarget = nil
+        return
+    end
+    if not FarmTarget or not zombieAlive(FarmTarget) then
+        FarmTarget = nearestZombie(math.huge)
+    end
+    if not FarmTarget then
+        if not SafePos then return end
+        local look = r.CFrame.LookVector
+        local flat = Vector3.new(look.X, 0, look.Z)
+        if flat.Magnitude < 0.01 then flat = Vector3.new(0, 0, -1) end
+        r.CFrame = CFrame.lookAt(SafePos, SafePos + flat)
+        r.AssemblyLinearVelocity = Vector3.zero
+        r.AssemblyAngularVelocity = Vector3.zero
+        return
+    end
+    local zr = FarmTarget.HumanoidRootPart
+    if Options.FarmPos.Value == L.PosAbove or Options.FarmPos.Value == L.PosBelow then
+        local offset = Options.FarmPos.Value == L.PosBelow and -Options.BelowDepth.Value or Options.AboveHeight.Value
+        local pos = zr.Position + Vector3.new(0, offset, 0)
+        if Options.FaceDown.Value then
+            r.CFrame = CFrame.lookAt(pos, zr.Position, zr.CFrame.LookVector)
+        else
+            local flat = r.CFrame.LookVector
+            r.CFrame = CFrame.lookAt(pos, pos + Vector3.new(flat.X, 0, flat.Z))
+        end
+    else
+        local back = zr.CFrame.LookVector * -Options.FarmDistance.Value
+        local pos = zr.Position + Vector3.new(back.X, Options.FarmHeight.Value, back.Z)
+        r.CFrame = CFrame.lookAt(pos, Vector3.new(zr.Position.X, pos.Y, zr.Position.Z))
+    end
+    r.AssemblyLinearVelocity = Vector3.zero
+    r.AssemblyAngularVelocity = Vector3.zero
+end))
+
+local function isDrop(obj)
+    if not obj:IsA("BasePart") or not obj:FindFirstChildOfClass("TouchTransmitter") then return nil end
+    local n = obj.Name:lower()
+    if n:find("candy") or n:find("cand") then return "candy" end
+    if n:find("diamond") then return "diamond" end
+    return nil
+end
+
+task.spawn(function()
+    while not stopped() do
+        task.wait(0.3)
+        if Options.AutoCollect.Value and alive() then
+            local want = Options.CollectWhat.Value
+            local r = root()
+            for _, obj in ipairs(workspace:GetChildren()) do
+                local kind = isDrop(obj)
+                if kind and ((kind == "diamond" and want[L.CollectDiamond]) or (kind == "candy" and want[L.CollectCandy])) then
+                    if firetouchinterest then
+                        pcall(function()
+                            firetouchinterest(r, obj, 0)
+                            task.wait()
+                            firetouchinterest(r, obj, 1)
+                        end)
+                    else
+                        local old = r.CFrame
+                        r.CFrame = obj.CFrame
+                        task.wait(0.1)
+                        r.CFrame = old
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local KeyMap = {
+    Q = Enum.KeyCode.Q, E = Enum.KeyCode.E, R = Enum.KeyCode.R, F = Enum.KeyCode.F,
+    X = Enum.KeyCode.X, Z = Enum.KeyCode.Z, C = Enum.KeyCode.C, V = Enum.KeyCode.V,
+}
+
+local function pressKey(k)
+    pcall(function()
+        VIM:SendKeyEvent(true, k, false, game)
+        task.wait(0.05)
+        VIM:SendKeyEvent(false, k, false, game)
+    end)
+end
+
+local UIS = game:GetService("UserInputService")
+
+local function clickPoint()
+    local cam = workspace.CurrentCamera
+    if AimTarget and AimTarget.Parent and cam then
+        local v, onScreen = cam:WorldToViewportPoint(AimTarget.Position)
+        if onScreen then
+            local inset = game:GetService("GuiService"):GetGuiInset()
+            return v.X, v.Y + inset.Y
+        end
+    end
+    local size = cam and cam.ViewportSize or Vector2.new(800, 600)
+    return size.X / 2, size.Y / 2
+end
+
+local TouchId = 7000
+
+local TapMod = nil
+pcall(function()
+    TapMod = require(ReplicatedStorage:WaitForChild("TapAim", 5))
+end)
+local TapState = nil
+
+local function tapTables()
+    if TapState ~= nil then return TapState end
+    TapState = false
+    pcall(function()
+        if not TapMod or not TapMod.IsMobile() or not debug.getupvalues then return end
+        local tools, last, any
+        for _, v in pairs(debug.getupvalues(TapMod.Tapped)) do
+            if type(v) == "table" then tools = v end
+        end
+        for _, v in pairs(debug.getupvalues(TapMod.LastPosition)) do
+            if type(v) == "table" then last = v end
+        end
+        for _, v in pairs(debug.getupvalues(TapMod.AnyTap)) do
+            if type(v) == "table" then any = v end
+        end
+        if tools and last and any then
+            TapState = { tools = tools, last = last, any = any }
+        end
+    end)
+    return TapState
+end
+
+local function mobileTap(tool, part)
+    local st = tapTables()
+    if not st or not part or not part.Parent then return false end
+    local entry = st.tools[tool]
+    local cam = workspace.CurrentCamera
+    local pos = part.Position
+    local dir = pos - cam.CFrame.Position
+    if dir.Magnitude < 0.01 then dir = Vector3.new(0, -1, 0) end
+    local sp = cam:WorldToViewportPoint(pos)
+    st.last.cf = CFrame.lookAt(pos, pos + dir.Unit)
+    st.last.target = part
+    st.last.screen = Vector2.new(sp.X, sp.Y)
+    for _, fn in ipairs(table.clone(st.any)) do
+        task.spawn(pcall, fn, pos)
+    end
+    if entry then
+        for _, fn in ipairs(entry.tapped) do
+            task.spawn(pcall, fn, pos)
+        end
+        if entry.activate and tool.Enabled then
+            pcall(function() tool:Activate() end)
+        end
+    else
+        pcall(function() tool:Activate() end)
+    end
+    return true
+end
+
+local function toolClick(tool, hold, z)
+    local part = z and z:FindFirstChild("HumanoidRootPart")
+    if mobileTap(tool, part) then return end
+    pcall(function() tool:Activate() end)
+    if not Options.RealClick.Value then return end
+    local x, y = clickPoint()
+    if UIS.TouchEnabled then
+        TouchId = TouchId + 1
+        local id = TouchId
+        local ok = pcall(function() VIM:SendTouchEvent(id, 0, x, y) end)
+        if ok then
+            task.delay(hold or 0.05, function()
+                pcall(function() VIM:SendTouchEvent(id, 2, x, y) end)
+                pcall(function() tool:Deactivate() end)
+            end)
+            return
+        end
+    end
+    pcall(function() VIM:SendMouseButtonEvent(x, y, 0, true, game, 0) end)
+    task.delay(hold or 0.05, function()
+        local x2, y2 = clickPoint()
+        pcall(function() VIM:SendMouseButtonEvent(x2, y2, 0, false, game, 0) end)
+        pcall(function() tool:Deactivate() end)
+    end)
+end
+
+local function aimAt(z)
+    local r = root()
+    if not r or not z then return end
+    local zr = z.HumanoidRootPart
+    local above = Options.AutoFarm.Value and (Options.FarmPos.Value == L.PosAbove or Options.FarmPos.Value == L.PosBelow)
+    if above and Options.FaceDown.Value then
+        r.CFrame = CFrame.lookAt(r.Position, zr.Position, zr.CFrame.LookVector)
+    elseif not above or (r.Position - zr.Position).Magnitude > 0.5 then
+        local flat = Vector3.new(zr.Position.X, r.Position.Y, zr.Position.Z)
+        if (flat - r.Position).Magnitude > 0.5 then
+            r.CFrame = CFrame.lookAt(r.Position, flat)
+        end
+    end
+    if Options.AimLock.Value then
+        AimTarget = zr
+    end
+end
+
+local function onCooldown(tool)
+    local n = tool.Name
+    return n:match("^%d+$") ~= nil or n:match("%[%d+s%]$") ~= nil or n:match("%(%d+s%)$") ~= nil
+end
+
+local ToolIndex = {}
+for _, e in pairs(ElementByName) do
+    if type(e.toolOrder) == "table" then
+        for i, n in ipairs(e.toolOrder) do
+            if ToolIndex[n] == nil then ToolIndex[n] = i end
+        end
+    end
+end
+
+local ToolSlot = setmetatable({}, { __mode = "k" })
+
+local function slotOf(tool)
+    if ToolSlot[tool] then return ToolSlot[tool] end
+    if onCooldown(tool) then return nil end
+    local i = ToolIndex[tool.Name] or ToolIndex[(tool.Name:gsub("%s*[%(%[][^%)%]]*[%)%]]%s*$", ""))]
+    if i then ToolSlot[tool] = i end
+    return i
+end
+
+local function slotAllowed(tool)
+    local slot = slotOf(tool)
+    if not slot then return true end
+    return Options.SkillSlots.Value[tostring(slot)] == true
+end
+
+task.spawn(function()
+    while not stopped() do
+        task.wait(0.2)
+        for _, t in ipairs(getTools()) do slotOf(t) end
+    end
+end)
+
+local function keySkill(tool, key, z)
+    local h = humanoid()
+    local c = char()
+    local animator = h and h:FindFirstChildOfClass("Animator")
+    local animate = c and c:FindFirstChild("Animate")
+    local tracks = {}
+    local con
+    if animator then
+        con = animator.AnimationPlayed:Connect(function(tr)
+            local anim = tr.Animation
+            if tr.Looped then return end
+            if animate and anim and anim:IsDescendantOf(animate) then return end
+            table.insert(tracks, tr)
+        end)
+    end
+    local nameBefore = tool.Name
+    pressKey(key)
+    local t0 = os.clock()
+    while os.clock() - t0 < 0.35 and #tracks == 0 and tool.Name == nameBefore do
+        task.wait(0.03)
+    end
+    if #tracks > 0 or tool.Name ~= nameBefore then
+        local t1 = os.clock()
+        while os.clock() - t1 < Options.KeyPause.Value do
+            local playing = false
+            for _, tr in ipairs(tracks) do
+                if tr.IsPlaying then playing = true break end
+            end
+            if not playing and os.clock() - t1 > 0.2 then break end
+            if not inArena() or not Options.AutoSkill.Value then break end
+            if z and zombieAlive(z) then aimAt(z) end
+            task.wait(0.05)
+        end
+    end
+    if con then con:Disconnect() end
+end
+
+local skillStep
+
+task.spawn(function()
+    while not stopped() do
+        task.wait(0.1)
+        local ok, err = pcall(function() skillStep() end)
+        if not ok then
+            AimTarget = nil
+            CastUntil = 0
+            warn("[EMA] skill loop: " .. tostring(err))
+            task.wait(1)
+        end
+    end
+end)
+
+skillStep = function()
+        if Options.AutoSkill.Value and inArena() then
+            local z = nearestZombie(Options.TargetRange.Value)
+            if not z then
+                AimTarget = nil
+                if not Options.AutoFarm.Value then setStatus(L.Waiting) end
+            else
+                setStatus(L.Fighting .. z.Name)
+                for _, tool in ipairs(getTools()) do
+                    if not Options.AutoSkill.Value or stopped() then break end
+                    if not zombieAlive(z) then
+                        z = nearestZombie(Options.TargetRange.Value)
+                        if not z then break end
+                    end
+                    if not onCooldown(tool) and slotAllowed(tool) then
+                        local h = humanoid()
+                        if h and tool.Parent ~= char() then
+                            pcall(function() h:EquipTool(tool) end)
+                            task.wait(0.15)
+                        end
+                        aimAt(z)
+                        local nameBefore = tool.Name
+                        CastUntil = os.clock() + Options.CastTime.Value
+                        local keys = Options.SkillKeys.Value
+                        for name, on in pairs(keys) do
+                            if on and KeyMap[name] and tool.Parent == char() and inArena() then
+                                aimAt(z)
+                                keySkill(tool, KeyMap[name], z)
+                            end
+                        end
+                        nameBefore = tool.Name
+                        if keys.Click then
+                            toolClick(tool, Options.ClickHold.Value, z)
+                        end
+                        local t0 = os.clock()
+                        local lastClick = os.clock()
+                        local fired = false
+                        while os.clock() - t0 < Options.CastTime.Value do
+                            if tool.Name ~= nameBefore or onCooldown(tool) then
+                                fired = true
+                                break
+                            end
+                            if not inArena() or not Options.AutoSkill.Value or tool.Parent ~= char() then break end
+                            if zombieAlive(z) then aimAt(z) end
+                            if keys.Click and Options.SpamClick.Value and os.clock() - lastClick >= Options.ClickRate.Value then
+                                lastClick = os.clock()
+                                toolClick(tool, math.min(Options.ClickHold.Value, Options.ClickRate.Value * 0.8), z)
+                            end
+                            task.wait(0.03)
+                        end
+                        CastUntil = 0
+                        if fired then task.wait(0.3) end
+                        local hh = humanoid()
+                        if hh then pcall(function() hh:UnequipTools() end) end
+                        task.wait(Options.SkillDelay.Value)
+                    end
+                end
+                AimTarget = nil
+            end
+        else
+            AimTarget = nil
+        end
+end
+
+local Original = setmetatable({}, { __mode = "k" })
+task.spawn(function()
+    while not stopped() do
+        task.wait(0.5)
+        local on = Options.Hitbox.Value
+        local size = Options.HitboxSize.Value
+        local trans = Options.HitboxTrans.Value
+        for _, z in ipairs(getEnemies()) do
+            local zr = z:FindFirstChild("HumanoidRootPart")
+            if zr then
+                if on and zombieAlive(z) then
+                    if not Original[zr] then
+                        Original[zr] = { zr.Size, zr.Transparency, zr.CanCollide }
+                    end
+                    zr.Size = Vector3.new(size, size, size)
+                    zr.Transparency = trans
+                    zr.CanCollide = false
+                elseif Original[zr] then
+                    local o = Original[zr]
+                    zr.Size, zr.Transparency, zr.CanCollide = o[1], o[2], o[3]
+                    Original[zr] = nil
+                end
+            end
+        end
+    end
+end)
+
+task.spawn(function()
+    while not stopped() do
+        task.wait(1)
+        if Options.CamClip.Value and LP.DevCameraOcclusionMode ~= Enum.DevCameraOcclusionMode.Invisicam then
+            pcall(function() LP.DevCameraOcclusionMode = Enum.DevCameraOcclusionMode.Invisicam end)
+        end
+        if not inSurvival() and not Options.AutoJoin.Value then
+            setStatus(L.NotInSurvival)
+        elseif not Options.AutoSkill.Value and not Options.AutoFarm.Value then
+            setStatus(L.Idle)
+        end
+    end
+end)
+
+local function setWindowSize(w, h)
+    local vp = workspace.CurrentCamera.ViewportSize
+    w = math.clamp(math.floor(w), 300, math.max(300, vp.X - 10))
+    h = math.clamp(math.floor(h), 200, math.max(200, vp.Y - 10))
+    pcall(function()
+        Window.Size = UDim2.fromOffset(w, h)
+        Window.Maximize(true, true, true)
+        Window.Maximize(false, true, true)
+    end)
+end
+
+local SecWin = Tabs.Settings:AddSection(L.SecWindow)
+addSlider(SecWin, "WinWidth", {
+    Title = L.WinWidth,
+    Default = DefaultW,
+    Min = 300,
+    Max = math.max(301, math.floor(ViewSize.X)),
+    Rounding = 0,
+    Callback = function(v)
+        if Options.WinHeight then setWindowSize(v, Options.WinHeight.Value) end
+    end,
+})
+addSlider(SecWin, "WinHeight", {
+    Title = L.WinHeight,
+    Default = DefaultH,
+    Min = 200,
+    Max = math.max(201, math.floor(ViewSize.Y)),
+    Rounding = 0,
+    Callback = function(v)
+        if Options.WinWidth then setWindowSize(Options.WinWidth.Value, v) end
+    end,
+})
+SecWin:AddButton({
+    Title = L.WinFit,
+    Callback = function()
+        local vp = workspace.CurrentCamera.ViewportSize
+        local w = math.floor(math.min(580, vp.X - 30))
+        local h = math.floor(math.min(460, vp.Y - 30))
+        Options.WinWidth:SetValue(w)
+        Options.WinHeight:SetValue(h)
+        setWindowSize(w, h)
+    end,
+})
+
+track(RunService.Heartbeat:Connect(function()
+    local gui = Fluent.GUI
+    if not gui then return end
+    local vpY = workspace.CurrentCamera.ViewportSize.Y
+    for _, f in ipairs(gui:GetChildren()) do
+        local sc = f:IsA("Frame") and f.Visible and f:FindFirstChildOfClass("UISizeConstraint")
+        if sc and sc.MinSize.X == 170 and f.Size.Y.Offset > 0 then
+            local maxH = math.max(120, vpY - 40)
+            if f.Size.Y.Offset > maxH then
+                f.Size = UDim2.fromOffset(f.Size.X.Offset, maxH)
+            end
+            local top = f.AbsolutePosition.Y
+            if top < 10 then
+                f.Position = UDim2.fromOffset(f.Position.X.Offset, f.Position.Y.Offset + (10 - top))
+            elseif top + f.AbsoluteSize.Y > vpY - 10 then
+                f.Position = UDim2.fromOffset(f.Position.X.Offset, f.Position.Y.Offset - (top + f.AbsoluteSize.Y - (vpY - 10)))
+            end
+        end
+    end
+end))
+
+local Drag = { slider = nil, list = nil, frozen = {} }
+local HookedRails = setmetatable({}, { __mode = "k" })
+
+local function freezeScroll(inst)
+    local p = inst.Parent
+    while p do
+        if p:IsA("ScrollingFrame") and p.ScrollingEnabled then
+            p.ScrollingEnabled = false
+            table.insert(Drag.frozen, p)
+        end
+        p = p.Parent
+    end
+end
+
+local function unfreezeScroll()
+    for _, sf in ipairs(Drag.frozen) do
+        pcall(function() sf.ScrollingEnabled = true end)
+    end
+    table.clear(Drag.frozen)
+end
+
+local function applySlider(x)
+    local s = Drag.slider
+    if not s then return end
+    local o = Options[s.id]
+    local rail = s.rail
+    if not o or not rail.Parent or rail.AbsoluteSize.X <= 0 then return end
+    local frac = math.clamp((x - rail.AbsolutePosition.X) / rail.AbsoluteSize.X, 0, 1)
+    o:SetValue(o.Min + (o.Max - o.Min) * frac)
+end
+
+local function hookRails()
+    local gui = Fluent.GUI
+    if not gui then return end
+    for _, d in ipairs(gui:GetDescendants()) do
+        if d:IsA("UISizeConstraint") and d.MaxSize.X == 150 and d.Parent and d.Parent:IsA("Frame") and not HookedRails[d.Parent] then
+            local rail = d.Parent
+            local elem = rail.Parent
+            local id
+            if elem then
+                for _, t in ipairs(elem:GetDescendants()) do
+                    if t:IsA("TextLabel") and SliderTitles[t.Text] then
+                        id = SliderTitles[t.Text]
+                        break
+                    end
+                end
+            end
+            if id then
+                HookedRails[rail] = id
+                rail.Active = true
+                track(rail.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+                        Drag.slider = { rail = rail, id = id }
+                        freezeScroll(rail)
+                        applySlider(input.Position.X)
+                    end
+                end))
+            end
+        end
+    end
+end
+
+local function openLists()
+    local lists = {}
+    local gui = Fluent.GUI
+    if not gui then return lists end
+    for _, f in ipairs(gui:GetChildren()) do
+        local sc = f:IsA("Frame") and f.Visible and f:FindFirstChildOfClass("UISizeConstraint")
+        if sc and sc.MinSize.X == 170 then
+            local sf = f:FindFirstChildWhichIsA("ScrollingFrame", true)
+            if sf then table.insert(lists, sf) end
+        end
+    end
+    return lists
+end
+
+track(UIS.InputBegan:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.Touch then return end
+    local pos = input.Position
+    for _, sf in ipairs(openLists()) do
+        local ap, as = sf.AbsolutePosition, sf.AbsoluteSize
+        if pos.X >= ap.X and pos.X <= ap.X + as.X and pos.Y >= ap.Y and pos.Y <= ap.Y + as.Y then
+            Drag.list = { sf = sf, y = pos.Y, canvas = sf.CanvasPosition.Y }
+            break
+        end
+    end
+end))
+
+track(UIS.InputChanged:Connect(function(input)
+    local t = input.UserInputType
+    if t ~= Enum.UserInputType.Touch and t ~= Enum.UserInputType.MouseMovement then return end
+    if Drag.slider then
+        applySlider(input.Position.X)
+    end
+    if Drag.list and t == Enum.UserInputType.Touch then
+        local l = Drag.list
+        local sf = l.sf
+        if not sf.Parent then Drag.list = nil return end
+        local maxY = math.max(0, sf.AbsoluteCanvasSize.Y - sf.AbsoluteWindowSize.Y)
+        local y = math.clamp(l.canvas - (input.Position.Y - l.y), 0, maxY)
+        sf.CanvasPosition = Vector2.new(sf.CanvasPosition.X, y)
+    end
+end))
+
+track(UIS.InputEnded:Connect(function(input)
+    local t = input.UserInputType
+    if t == Enum.UserInputType.Touch or t == Enum.UserInputType.MouseButton1 then
+        if Drag.slider then
+            Drag.slider = nil
+            unfreezeScroll()
+        end
+        Drag.list = nil
+    end
+end))
+
+task.spawn(function()
+    while not stopped() do
+        pcall(hookRails)
+        task.wait(2)
+    end
+end)
+
+local SecLang = Tabs.Settings:AddSection(L.SecLang)
+addPicker(SecLang, "Language", {
+    Title = L.Language,
+    Values = { "TH", "EN" },
+    Multi = false,
+    Default = Lang == "EN" and 2 or 1,
+    Callback = function(v)
+        if v ~= Lang then
+            writeFile("lang.txt", v)
+            Fluent:Notify({ Title = "Elemental Magic Arena", Content = L.LangSaved, Duration = 4 })
+        end
+    end,
+})
+
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({ "Language" })
+InterfaceManager:SetFolder(FOLDER)
+SaveManager:SetFolder(FOLDER .. "/configs")
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+local ToggleGui = Instance.new("ScreenGui")
+ToggleGui.Name = "EMAToggle"
+ToggleGui.ResetOnSpawn = false
+ToggleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ToggleGui.DisplayOrder = 999
+pcall(function()
+    ToggleGui.Parent = (gethui and gethui()) or CoreGui
+end)
+if not ToggleGui.Parent then
+    ToggleGui.Parent = LP:WaitForChild("PlayerGui")
+end
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Name = "Button"
+ToggleBtn.Size = UDim2.fromOffset(52, 52)
+ToggleBtn.Position = UDim2.new(0, 16, 0.5, -26)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(28, 28, 32)
+ToggleBtn.BackgroundTransparency = 0.15
+ToggleBtn.Text = "EMA"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.TextSize = 14
+ToggleBtn.AutoButtonColor = true
+ToggleBtn.Parent = ToggleGui
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(1, 0)
+btnCorner.Parent = ToggleBtn
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Color3.fromRGB(96, 205, 255)
+btnStroke.Thickness = 2
+btnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+btnStroke.Parent = ToggleBtn
+
+local dragInput, dragStart, startPos, moved = nil, nil, nil, false
+
+track(ToggleBtn.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+        dragStart = input.Position
+        startPos = ToggleBtn.Position
+        moved = false
+    end
+end))
+
+track(UIS.InputChanged:Connect(function(input)
+    if not dragInput then return end
+    if input == dragInput or input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        if delta.Magnitude > 6 then moved = true end
+        if moved then
+            ToggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end
+end))
+
+track(UIS.InputEnded:Connect(function(input)
+    if dragInput and (input == dragInput or input.UserInputType == Enum.UserInputType.MouseButton1) then
+        local wasMoved = moved
+        dragInput = nil
+        if not wasMoved then
+            pcall(function() Window:Minimize() end)
+        end
+    end
+end))
+
+local cleaned = false
+local function cleanup()
+    if cleaned then return end
+    cleaned = true
+    pcall(function() ToggleGui:Destroy() end)
+    pcall(function() PickerGui:Destroy() end)
+    pcall(unfreezeScroll)
+    AimTarget = nil
+    CastUntil = 0
+    pcall(setNoclip, false)
+    pcall(function() LP.DevCameraOcclusionMode = OrigOcclusion end)
+    pcall(function()
+        local h = humanoid()
+        if h and CamOverride then workspace.CurrentCamera.CameraSubject = h end
+        CamOverride = false
+    end)
+    FarmTarget = nil
+    for _, c in ipairs(Conns) do
+        pcall(function() c:Disconnect() end)
+    end
+    table.clear(Conns)
+    for zr, o in pairs(Original) do
+        pcall(function()
+            zr.Size, zr.Transparency, zr.CanCollide = o[1], o[2], o[3]
+        end)
+        Original[zr] = nil
+    end
+    if Env.EMA_Session == Session then
+        Env.EMA_Session = nil
+        Env.EMA_Unload = nil
+    end
+end
+
+Env.EMA_Unload = function()
+    cleanup()
+    pcall(function() Fluent:Destroy() end)
+end
+
+task.spawn(function()
+    while not stopped() do
+        task.wait(0.5)
+    end
+    cleanup()
+    if not Fluent.Unloaded then
+        pcall(function() Fluent:Destroy() end)
+    end
+end)
+
+local AUTO = "autosave"
+local loadedSave = false
+pcall(function()
+    if isfile and isfile(FOLDER .. "/configs/settings/" .. AUTO .. ".json") then
+        loadedSave = SaveManager:Load(AUTO) and true or false
+    end
+end)
+if not loadedSave then
+    pcall(function() SaveManager:LoadAutoloadConfig() end)
+end
+
+local function snapshot()
+    local t = {}
+    for k, o in pairs(Options) do
+        if k ~= "Language" then
+            local v = o.Value
+            if typeof(v) == "Color3" then v = v:ToHex() end
+            if typeof(v) == "EnumItem" then v = tostring(v) end
+            t[k] = v
+        end
+    end
+    local ok, s = pcall(HttpService.JSONEncode, HttpService, t)
+    return ok and s or ""
+end
+
+task.spawn(function()
+    local last = snapshot()
+    while not stopped() do
+        task.wait(2)
+        local now = snapshot()
+        if now ~= last and not stopped() then
+            last = now
+            pcall(function() SaveManager:Save(AUTO) end)
+        end
+    end
+end)
+
+Fluent:Notify({ Title = "Elemental Magic Arena", Content = loadedSave and L.LoadedSave or L.Loaded, Duration = 5 })
